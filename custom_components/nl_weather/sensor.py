@@ -117,12 +117,39 @@ def _get_alert_attributes(data: Weather) -> dict[str, object]:
     }
 
 
+ALERT_SEVERITY: dict[Alert, int] = {
+    Alert.NONE: 0,
+    Alert.YELLOW: 1,
+    Alert.ORANGE: 2,
+    Alert.RED: 3,
+}
+
+
 def _get_alert_level(data: Weather) -> Alert:
-    # TODO: Is the first alert always the highest?
+    """Return the highest active weather alert level."""
+    candidate_levels: list[Alert] = []
+
     try:
-        return Alert(data["hourly"]["forecast"][0]["alertLevel"])
-    except (KeyError, IndexError, TypeError, ValueError):
+        forecast = data["hourly"]["forecast"]
+        if isinstance(forecast, list) and forecast and isinstance(forecast[0], dict):
+            level_str = forecast[0].get("alertLevel")
+            if level_str is not None:
+                candidate_levels.append(Alert(level_str))
+    except (KeyError, ValueError, TypeError, AttributeError):
+        pass
+
+    for alert in _get_alerts(data):
+        try:
+            code = alert.get("code") or alert.get("level")
+            if code is not None:
+                candidate_levels.append(Alert(code))
+        except (KeyError, ValueError, TypeError):
+            pass
+
+    if not candidate_levels:
         return Alert.NONE
+
+    return max(candidate_levels, key=lambda alert: ALERT_SEVERITY.get(alert, 0))
 
 
 def _get_observation_param(
@@ -160,10 +187,32 @@ def _get_forecast_temperature(
     def _fn(data: Weather) -> float | None:
         try:
             return data["daily"]["forecast"][day_index]["temperature"][temp_key]  # type: ignore[literal-required]
-        except (KeyError, IndexError, TypeError):
+        except (KeyError, IndexError, TypeError, AttributeError):
             return None
 
     return _fn
+
+
+def _get_heat_force_index(data: Weather) -> float | None:
+    """Return current hourly heat force index from forecast data."""
+    try:
+        forecast = data["hourly"]["forecast"]
+        if isinstance(forecast, list) and forecast and isinstance(forecast[0], dict):
+            return forecast[0].get("heatIndex")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        pass
+    return None
+
+
+def _get_heat_force_index_today(data: Weather) -> float | None:
+    """Return today's daily heat force index from forecast data."""
+    try:
+        forecast = data["daily"]["forecast"]
+        if isinstance(forecast, list) and forecast and isinstance(forecast[0], dict):
+            return forecast[0].get("heatIndex")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        pass
+    return None
 
 
 ALERT_SENSOR_DESCRIPTIONS: list[AlertSensorDescription] = [
@@ -395,14 +444,14 @@ FORECAST_SENSOR_DESCRIPTIONS: list[ForecastSensorDescription] = [
         translation_key="heat_force_index",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:sun-thermometer",
-        value_fn=lambda data: data["hourly"]["forecast"][0].get("heatIndex", None),
+        value_fn=_get_heat_force_index,
     ),
     ForecastSensorDescription(
         key="heat_force_index_today",
         translation_key="heat_force_index_today",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:sun-thermometer-outline",
-        value_fn=lambda data: data["daily"]["forecast"][0].get("heatIndex", None),
+        value_fn=_get_heat_force_index_today,
     ),
 ]
 
