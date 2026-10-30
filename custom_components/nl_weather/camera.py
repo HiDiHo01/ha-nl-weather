@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_RADAR_STYLE,
     DOMAIN,
     RADAR_STYLES,
+    WMS_BBOX_EPSG3857,
     RadarStyle,
 )
 from .coordinator import NLWeatherConfigEntry
@@ -33,7 +34,7 @@ from .KNMI.wms import WMSException
 _LOGGER = logging.getLogger(__name__)
 
 # BBOX in EPSG:3857 (Web Mercator). This is (49.14, 0.0, 54,68, 8.98) in EPSG:4326
-BACKGROUND_IMAGE_BBOX = (0.0, 6300000, 1000000, 7300000)
+BACKGROUND_IMAGE_BBOX = WMS_BBOX_EPSG3857
 BACKGROUND_IMAGE_BBOX_PARAM = ",".join(map(str, BACKGROUND_IMAGE_BBOX))
 
 
@@ -348,11 +349,11 @@ class PrecipitationRadarCam(Camera):
         await self.hass.async_add_executor_job(self._load_background)
         self._last_image_dt = None
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
+        """Handle entity addition to Home Assistant."""
+        await super().async_added_to_hass()
         self._ns.set_callback("radar_forecast", self._attr_unique_id, self._set_latest)
         self.async_on_remove(
             self._config_entry.add_update_listener(self._async_on_config_entry_update)
         )
-
-        # TODO: Best place to do this?
         await self.hass.async_add_executor_job(self._load_background)
