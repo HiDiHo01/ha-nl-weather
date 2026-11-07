@@ -3,6 +3,5 @@ get_minute_forecast:
     entity:
       domain: weather
       integration: nl_weather
-      # Home Assistant resolves only built-in feature names; CLOSE_TILT is also bit 32.
       supported_features:
-        - cover.CoverEntityFeature.CLOSE_TILT
+        - climate.ClimateEntityFeature.SWING_MODE
