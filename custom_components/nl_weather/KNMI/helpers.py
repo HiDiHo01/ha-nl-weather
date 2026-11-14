@@ -5,6 +5,8 @@ from datetime import datetime
 from math import atan2, cos, log, pi, radians, sin, sqrt, tan
 from typing import Any, Final
 
+from PIL import Image, ImageDraw
+
 # Earth radius constants
 EARTH_RADIUS_KM: Final = 6371.0  # Haversine formula Earth radius (kilometers)
 EARTH_RADIUS_METERS: Final = 6378137.0  # EPSG:3857 Web Mercator radius (meters)
@@ -91,6 +93,34 @@ def epsg4325_to_epsg3857(coord: Coordinate) -> tuple[float, float]:
     x = EARTH_RADIUS_METERS * radians(coord.lon)
     y = EARTH_RADIUS_METERS * log(tan(pi / 4.0 + radians(lat) / 2.0))
     return x, y
+
+
+def lonlat_to_pixel(
+    lon: float,
+    lat: float,
+    bbox: tuple[float, float, float, float],
+    size: tuple[int, int],
+) -> tuple[float, float]:
+    """Project longitude/latitude to an EPSG:3857 image bounding box."""
+    x, y = epsg4325_to_epsg3857(Coordinate(lat, lon))
+    return (
+        (x - bbox[0]) / (bbox[2] - bbox[0]) * size[0],
+        (bbox[3] - y) / (bbox[3] - bbox[1]) * size[1],
+    )
+
+
+def add_location_markers(
+    image: Image.Image,
+    locations: list[Coordinate],
+    color: str,
+    bbox: tuple[float, float, float, float],
+) -> Image.Image:
+    """Draw optional location outlines on a projected image."""
+    draw = ImageDraw.Draw(image)
+    for location in locations:
+        x, y = lonlat_to_pixel(location.lon, location.lat, bbox, image.size)
+        draw.ellipse((x - 10, y - 10, x + 10, y + 10), outline=color, width=2)
+    return image
 
 
 def format_dt(dt: datetime) -> str:

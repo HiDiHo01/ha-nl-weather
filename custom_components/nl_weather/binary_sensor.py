@@ -15,6 +15,7 @@ from .coordinator import (
     NLWeatherNowcastCoordinator,
     NLWeatherUpdateCoordinator,
 )
+from .local_alerts import NLWeatherLocalAlertActiveSensor
 
 
 async def async_setup_entry(
@@ -30,6 +31,17 @@ async def async_setup_entry(
         async_add_entities(
             [
                 NLWeatherAlertActiveSensor(app_coordinator, config_entry, subentry),
+                *(
+                    [
+                        NLWeatherLocalAlertActiveSensor(
+                            config_entry.runtime_data.alerts_coordinator,
+                            config_entry,
+                            subentry,
+                        )
+                    ]
+                    if config_entry.runtime_data.alerts_coordinator is not None
+                    else []
+                ),
                 NLWeatherPrecipitationNowcastSensor(
                     nowcast_coordinator, config_entry, subentry
                 ),

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from random import randint
 from typing import NotRequired, TypedDict
 
+from aiohttp import ClientError
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, CONF_REGION
 from homeassistant.core import HomeAssistant
@@ -17,11 +18,14 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import (
+    APP_ALERTS_API_SCAN_INTERVAL,
     APP_FORECAST_API_SCAN_INTERVAL,
     APP_NOWCAST_API_SCAN_INTERVAL,
     CONF_STATION,
     PARAMETER_ATTRIBUTE_MAP,
 )
+from .KNMI.alerts import Alert as NationwideAlert
+from .KNMI.alerts import parse_alerts
 from .KNMI.app import (
     App,
     AppException,
@@ -77,6 +81,7 @@ class RuntimeData:
     app_coordinators: dict[str, "NLWeatherUpdateCoordinator"]
     nowcast_coordinators: dict[str, "NLWeatherNowcastCoordinator"]
     edr_coordinators: dict[str, "NLWeatherEDRCoordinator"]
+    alerts_coordinator: "NLWeatherAlertsCoordinator | None" = None
 
 
 class NLWeatherUpdateCoordinator(DataUpdateCoordinator[Weather]):
@@ -179,6 +184,29 @@ class NLWeatherUpdateCoordinator(DataUpdateCoordinator[Weather]):
                 "forecast": enriched_forecast,
             },
         }
+
+
+class NLWeatherAlertsCoordinator(DataUpdateCoordinator[list[NationwideAlert]]):
+    """Five-minute coordinator for nationwide location-aware KNMI warnings."""
+
+    def __init__(self, hass: HomeAssistant, entry: NLWeatherConfigEntry) -> None:
+        """Initialize the non-critical warning data source."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=f"NL Weather KNMI nationwide warnings for {entry.title}",
+            always_update=True,
+            update_interval=APP_ALERTS_API_SCAN_INTERVAL,
+        )
+        self._api = entry.runtime_data.app
+
+    async def _async_update_data(self) -> list[NationwideAlert]:
+        """Retrieve and validate KNMI warning parts."""
+        try:
+            return parse_alerts(await self._api.alerts_nationwide())
+        except (AppException, ClientError, TimeoutError, ValueError, TypeError) as err:
+            raise UpdateFailed("Unable to retrieve valid nationwide warnings") from err
 
 
 class NLWeatherNowcastCoordinator(
