@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.nl_weather import sensor as sensor_module
 from custom_components.nl_weather.const import Alert
 from custom_components.nl_weather.KNMI.alerts import Alert as NationwideAlert
 from custom_components.nl_weather.KNMI.alerts import AlertLevel
@@ -12,7 +13,6 @@ from custom_components.nl_weather.local_alerts import (
     LOCAL_ALERT_DESCRIPTIONS,
     NLWeatherLocalAlertSensor,
 )
-from custom_components.nl_weather import sensor as sensor_module
 from custom_components.nl_weather.sensor import (
     _get_alert_level,
     _get_cloud_coverage,
