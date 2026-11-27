@@ -142,6 +142,11 @@ class NLWeatherUpdateCoordinator(DataUpdateCoordinator[Weather]):
                     daily_forecast["date"],
                 )
 
+                _LOGGER.debug(
+                    "KNMI weather/detail UV data: %r",
+                    day_detail.get("uvIndex", "<missing>"),
+                )
+
                 enriched_forecast.append(
                     {
                         **daily_forecast,
