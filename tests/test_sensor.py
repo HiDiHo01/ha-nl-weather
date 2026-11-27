@@ -174,31 +174,29 @@ def test_get_uv_index_today(monkeypatch: pytest.MonkeyPatch) -> None:
         "now",
         lambda: datetime(2026, 11, 28, tzinfo=UTC),
     )
-    forecast = [
-        {"date": "2026-11-27T00:00:00Z"},
-        {"date": "2026-11-28T00:00:00Z", "uv_index": 0},
-        {"date": "2026-11-29T00:00:00Z", "uv_index": 3.5},
-    ]
+    yesterday = {"date": "2026-11-27T00:00:00Z"}
+    today = {"date": "2026-11-28T00:00:00Z", "uv_index": 0}
+    tomorrow = {"date": "2026-11-29T00:00:00Z", "uv_index": 3.5}
 
-    assert _get_uv_index_today({"daily": {"forecast": forecast}}) == 0.0
     assert (
         _get_uv_index_today(
-            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": 4.5}]}}
+            {"daily": {"forecast": [yesterday, today, tomorrow]}}
+        )
+        == 0.0
+    )
+    assert (
+        _get_uv_index_today(
+            {"daily": {"forecast": [yesterday, {**today, "uv_index": 4.5}]}}
         )
         == 4.5
     )
-    assert (
-        _get_uv_index_today(
-            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": None}]}}
+    for invalid_value in (None, "bad"):
+        assert (
+            _get_uv_index_today(
+                {"daily": {"forecast": [yesterday, {**today, "uv_index": invalid_value}]}}
+            )
+            is None
         )
-        is None
-    )
-    assert (
-        _get_uv_index_today(
-            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": "bad"}]}}
-        )
-        is None
-    )
     assert _get_uv_index_today({"daily": {"forecast": [None]}}) is None
     assert _get_uv_index_today({"daily": {"forecast": []}}) is None
     assert _get_uv_index_today({"daily": {}}) is None
