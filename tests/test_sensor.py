@@ -12,6 +12,7 @@ from custom_components.nl_weather.local_alerts import (
     LOCAL_ALERT_DESCRIPTIONS,
     NLWeatherLocalAlertSensor,
 )
+from custom_components.nl_weather import sensor as sensor_module
 from custom_components.nl_weather.sensor import (
     _get_alert_level,
     _get_cloud_coverage,
@@ -166,14 +167,40 @@ def test_get_heat_force_index_today() -> None:
     assert _get_heat_force_index_today({}) is None
 
 
-def test_get_uv_index_today() -> None:
-    """Read today's UV index and safely handle absent or malformed forecasts."""
-    assert _get_uv_index_today({"daily": {"forecast": [{"uv_index": 4.5}]}}) == 4.5
-    assert _get_uv_index_today({"daily": {"forecast": [{"uv_index": 0}]}}) == 0.0
-    assert _get_uv_index_today({"daily": {"forecast": [{"uv_index": None}]}}) is None
-    assert _get_uv_index_today({"daily": {"forecast": [{"uv_index": "bad"}]}}) is None
-    assert _get_uv_index_today({"daily": {"forecast": []}}) is None
+def test_get_uv_index_today(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Select today's UV index rather than the previous day's forecast value."""
+    monkeypatch.setattr(
+        sensor_module.dt_util,
+        "now",
+        lambda: datetime(2026, 11, 28, tzinfo=UTC),
+    )
+    forecast = [
+        {"date": "2026-11-27T00:00:00Z"},
+        {"date": "2026-11-28T00:00:00Z", "uv_index": 0},
+        {"date": "2026-11-29T00:00:00Z", "uv_index": 3.5},
+    ]
+
+    assert _get_uv_index_today({"daily": {"forecast": forecast}}) == 0.0
+    assert (
+        _get_uv_index_today(
+            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": 4.5}]}}
+        )
+        == 4.5
+    )
+    assert (
+        _get_uv_index_today(
+            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": None}]}}
+        )
+        is None
+    )
+    assert (
+        _get_uv_index_today(
+            {"daily": {"forecast": [{**forecast[0]}, {**forecast[1], "uv_index": "bad"}]}}
+        )
+        is None
+    )
     assert _get_uv_index_today({"daily": {"forecast": [None]}}) is None
+    assert _get_uv_index_today({"daily": {"forecast": []}}) is None
     assert _get_uv_index_today({"daily": {}}) is None
     assert _get_uv_index_today({}) is None
 
