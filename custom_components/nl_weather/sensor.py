@@ -38,6 +38,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     ALERT_REGIONS,
@@ -211,15 +212,29 @@ def _get_heat_force_index(data: Weather) -> float | None:
 
 
 def _get_uv_index_today(data: Weather) -> float | None:
-    """Read today's UV index safely from enriched KNMI daily forecasts."""
+    """Read today's UV index from the matching local-date forecast."""
     try:
         forecast = data["daily"]["forecast"]
-        if isinstance(forecast, list) and forecast and isinstance(forecast[0], dict):
-            value = forecast[0].get("uv_index")
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                return float(value)
-    except (KeyError, IndexError, TypeError, AttributeError):
-        pass
+    except (KeyError, TypeError):
+        return None
+
+    if not isinstance(forecast, list):
+        return None
+
+    today = dt_util.now().date().isoformat()
+    for daily_forecast in forecast:
+        if not isinstance(daily_forecast, dict):
+            continue
+
+        forecast_date = daily_forecast.get("date")
+        if not isinstance(forecast_date, str) or forecast_date[:10] != today:
+            continue
+
+        value = daily_forecast.get("uv_index")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        return None
+
     return None
 
 
